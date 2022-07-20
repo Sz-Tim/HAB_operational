@@ -10,25 +10,28 @@ library(tidyverse)
 library(glue)
 library(jsonlite)
 library(lubridate)
-library(WeStCOMS)
+library(WeStCOMS) # devtools::install_github("Sz-Tim/WeStCOMS")
+library(ncdf4)
+library(sf)
 source("code/00_fn.R")
 
 cores <- 24
 
 # WeStCOMS dates
-v1_start <- "2014-10-28"
-v1_end <- "2019-04-01"
-v2_end <- "2022-06-01"
+dates.c <- list(v1_start="2014-10-28",
+                v1_end="2019-04-01",
+                v2_end="2022-06-01")
+dates.n <- map(dates.c, ~str_remove_all(.x, "-"))
 
 # directories
 dirs <- switch(get_os(), 
                osx=list(proj=getwd(), 
-                        part="~/Documents/SAMS/OffAqua/HB_HABs/data/",
+                        part="~/Documents/SAMS/HAB_Operational/ptrack/",
                         wc="~/Documents/SAMS/WeStCOMS/",
                         mesh="~/Documents/SAMS/WeStCOMS/data/",
                         cprn="~/Documents/SAMS/00_gis/copernicus/"),
                linux=list(proj=getwd(),
-                          part="/home/sa04ts/HAB_operational/init/",
+                          part="/home/sa04ts/HAB_operational/ptrack/",
                           wc="/media/archiver/common/sa01da-work/",
                           mesh="/home/sa04ts/FVCOM_meshes/",
                           cprn="/home/sa04ts/gis/copernicus/"),
@@ -53,31 +56,31 @@ setwd(dirs$part)
 
 # WeStCOMS v1
 wc1.prop <- setPartTrackProperties(parallelThreads=cores, 
-                                   destinationDirectory="out_v1/",
+                                   destinationDirectory="past/init_v1/",
                                    datadir=paste0(dirs$wc, "minch2/Archive/"),
                                    mesh1=paste0(dirs$mesh, "WeStCOMS_mesh.nc"),
                                    location="minch",
                                    minchVersion="2",
                                    sitefile="large_elem_centroids_v1.dat",
                                    sitefileEnd="fsa_sites_v1.dat",
-                                   start_ymd=str_remove_all(v1_start, "-"),
-                                   end_ymd=str_remove_all(v1_end, "-"))
+                                   start_ymd=dates.n$v1_start,
+                                   end_ymd=dates.n$v1_end)
 cat(wc1.prop, "\n", file="HAB_WeStCOMS1.properties")
 system2("bash", c("runPTrack_smn.sh", "HAB_WeStCOMS1.properties"))
 
 # WeStCOMS v2
 wc2.prop <- setPartTrackProperties(parallelThreads=cores,
-                                   destinationDirectory="out_v2/",
-                                   restartParticles="out_v1/locationsEnd.dat",
-                                   start_ymd=str_remove_all(v1_end, "-"),
-                                   end_ymd=str_remove_all(v2_end, "-"))
+                                   destinationDirectory="past/init_v2/",
+                                   restartParticles="past/init_v1/locationsEnd.dat",
+                                   start_ymd=dates.n$v1_end,
+                                   end_ymd=dates.n$v2_end)
 cat(wc2.prop, "\n", file="HAB_WeStCOMS2.properties")
 system2("bash", c("runPTrack_smn.sh", "HAB_WeStCOMS2.properties"))
 
 # compile output
-connect.f <- dir("out_v1/connectivity")
+connect.f <- dir("past/init_v1/connectivity")
 connect.v1 <- connect.f %>%
-  map_dfr(~read_delim(glue("out_v1/connectivity/{.x}"), 
+  map_dfr(~read_delim(glue("past/init_v1/connectivity/{.x}"), 
                       delim=" ", col_names=F, show_col_types=F) %>% 
             mutate(date=str_sub(.x, 14, 21)) %>%
             group_by(date) %>% 
@@ -86,9 +89,9 @@ connect.v1 <- connect.f %>%
   pivot_longer(-1, names_to="site.id", values_to="influx") %>%
   mutate(site.id=rep(fsa_v1$site.id, length(connect.f)),
          date=ymd(date))
-connect.f <- dir("out_v2/connectivity")
+connect.f <- dir("past/init_v2/connectivity")
 connect.v2 <- connect.f %>%
-  map_dfr(~read_delim(glue("out_v2/connectivity/{.x}"), 
+  map_dfr(~read_delim(glue("past/init_v1/connectivity/{.x}"), 
                       delim=" ", col_names=F, show_col_types=F) %>% 
             mutate(date=str_sub(.x, 14, 21)) %>%
             group_by(date) %>% 
@@ -100,7 +103,7 @@ connect.v2 <- connect.f %>%
 
 bind_rows(connect.v1 %>% filter(! date %in% connect.v2$date), 
           connect.v2) %>%
-  write_csv(paste0(dirs$proj, "/data/influx_init.csv"))
+  write_csv(paste0(dirs$proj, glue("/data/toDate/influx_{dates.n$v2_end}.csv")))
 
 setwd(dirs$proj)
 
@@ -117,8 +120,10 @@ mesh.f <- paste0(dirs$mesh,
 
 # load files
 mesh.sf <- map(mesh.f, loadMesh) 
-fsa.df <- glue("data/copy_fsa.txt") %>% fromJSON() %>% clean_fsa(v1_end)
-sampling.local <- fsa.df %>%
+fsa.df <- glue("data/toDate/fsa_{dates.n$v2_end}.txt") %>% 
+  fromJSON() %>% clean_fsa(dates.c$v1_end)
+# match fsa site locations to grid elements
+hydro.i_L <- fsa.df %>%
   group_by(grid) %>%
   group_split() %>%
   map2(.x=., .y=mesh.sf, 
@@ -132,7 +137,8 @@ sampling.local <- fsa.df %>%
   bind_rows %>%
   mutate(depth=pmin(10, depth.elem),
          obs.id=row_number())
-sampling.regional <- sampling.local %>%
+# match fsa site buffers to grid elements
+hydro.i_R <- hydro.i_L %>%
   select(-site.elem, -depth.elem, -starts_with("trinode")) %>%
   group_by(grid) %>%
   group_split() %>%
@@ -147,10 +153,10 @@ sampling.regional <- sampling.local %>%
          st_drop_geometry) %>%
   bind_rows %>%
   mutate(depth=pmin(10, depth.elem))
-write_csv(sampling.local, glue("data{sep}sampling_local.csv"))
-write_csv(sampling.regional, glue("data{sep}sampling_regional.csv"))
+write_csv(hydro.i_L, glue("data/toDate/hydro_i_L_{dates.n$v2_end}.csv"))
+write_csv(hydro.i_R, glue("data/toDate/hydro_i_R_{dates.n$v2_end}.csv"))
 
-# extract hydro data
+# set summary functions
 var.df <- tibble(var=c("temp", "salinity", "short_wave",
                        "u", "v", "ww", "km",
                        "uwind_speed", "vwind_speed", "precip"),
@@ -160,22 +166,24 @@ var.df <- tibble(var=c("temp", "salinity", "short_wave",
                  depthFn=c(mean, mean, NA,
                            mean, mean, mean, mean,
                            NA, NA, NA))
+# extract by lagged dates
 hydro_L <- hydro_R <- vector("list", nLags)
 for(i in 0:nLags) {
   cat("Starting lag", i, "\n")
-  hydro_L[[i+1]] <- sampling.local %>% 
+  hydro_L[[i+1]] <- hydro.i_L %>% 
     select(obs.id, site.id, date, depth, grid, site.elem, starts_with("trinode")) %>%
     mutate(date=str_remove_all(as.character(date-i), "-")) %>%
     extractHydroVars(., westcoms.dir, var.df$var, var.df$dayFn, var.df$depthFn,
                      cores=cores, progress=T) %>%
     rename_with(~paste0(.x, "_L", i), .cols=any_of(var.df$var))
-  hydro_R[[i+1]] <- sampling.regional %>% 
+  hydro_R[[i+1]] <- hydro.i_R %>% 
     select(obs.id, site.id, date, depth, grid, site.elem, starts_with("trinode")) %>%
     mutate(date=str_remove_all(as.character(date-i), "-")) %>%
     extractHydroVars(., westcoms.dir, var.df$var, var.df$dayFn, var.df$depthFn,
                      regional=T, cores=cores, progress=T) %>%
     rename_with(~paste0(.x, "_R", i), .cols=any_of(var.df$var))
 }
+# summarise lags to weekly averages
 hydro.df <- c(hydro_L, hydro_R) %>%
   reduce(., full_join) %>% 
   pivot_longer(c(contains("_L"), contains("_R")), names_to="param", values_to="value") %>%
@@ -195,14 +203,53 @@ hydro.df <- c(hydro_L, hydro_R) %>%
   ungroup %>%
   pivot_wider(names_from=c(res, timespan), values_from=4:ncol(.),
               names_glue="{.value}_{res}_{timespan}")
-write_csv(glue("data{sep}hydro_init.csv"))
+write_csv(hydro.df, glue("data/toDate/hydro_{dates.n$v2_end}.csv"))
 
 
 
 # Copernicus --------------------------------------------------------------
 
+cprn.df <- load_copernicus(dir(dirs$cprn, full.names=T), dates.c) %>% 
+  filter(!is.na(chl)) %>%
+  group_by(date) %>% mutate(id=row_number()) %>% ungroup
+cprn.sf <- cprn.df %>% filter(date==first(date)) %>%
+  st_as_sf(., coords=c("lon", "lat"), crs=4326)
 
+# match fsa v1 site locations
+fsa_v1.sf <- st_as_sf(fsa_v1, coords=c("x", "y"), crs=27700)
+fsa_v1.cprn <- fsa_v1 %>%
+  rename(site.id_v1=site.id) %>%
+  mutate(cprn_id=st_nearest_feature(fsa_v1.sf %>% st_transform(4326), cprn.sf))
+cprn.df <- left_join(cprn.df, 
+                    select(fsa_v1.cprn, -x, -y), 
+                    by=c("id"="cprn_id"))
 
+# match fsa v2 site locations
+fsa_v2.sf <- st_as_sf(fsa_v2, coords=c("x", "y"), crs=27700)
+fsa_v2.cprn <- fsa_v2 %>%
+  rename(site.id_v2=site.id) %>%
+  mutate(cprn_id=st_nearest_feature(fsa_v2.sf %>% st_transform(4326), cprn.sf))
+cprn.df <- left_join(cprn.df, 
+                    select(fsa_v2.cprn, -x, -y), 
+                    by=c("id"="cprn_id"))
+
+# calculate lags
+cprn.out <- cprn.df %>% 
+  filter(!is.na(site.id_v1) | !is.na(site.id_v2)) %>%
+  select(date, lat, lon, grid, id, site.id_v1, site.id_v2,
+         chl, attn, no3, o2, diato, dino, ph, po4, nppv, spco2) %>%
+  group_by(id) %>%
+  multijetlag(chl, attn, no3, o2, diato, dino, ph, po4, nppv, spco2, n=nLags) %>%
+  pivot_longer(-(1:7), names_to="var", values_to="val") %>%
+  mutate(timespan=if_else(str_split_fixed(var, "_", 2)[,2]=="", "0", "wk"),
+         var=str_split_fixed(var, "_", 2)[,1]) %>%
+  group_by(date, id, site.id_v1, site.id_v2, var, timespan) %>%
+  summarise(across(where(is.numeric), ~mean(.x, na.rm=T))) %>%
+  ungroup %>%
+  pivot_wider(names_from=c(var, timespan), values_from=val,
+              names_glue="{var}_{timespan}")
+  
+write_csv(cprn.out, glue("data/toDate/cprn_{dates.n$v2_end}.csv"))
 
 
 

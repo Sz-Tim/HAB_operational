@@ -5,6 +5,8 @@
 ## -----------------------------------------------------------------------------
 
 
+
+
 get_os <- function() {
   # https://www.r-bloggers.com/2015/06/identifying-the-os-from-r/
   sysinf <- Sys.info()
@@ -27,6 +29,8 @@ setPartTrackDirs <- function(base.dir="./",
                              java.dir="/home/sa04ts/particle_tracking/") {
   
 }
+
+
 
 setPartTrackProperties <- function(
   destinationDirectory="out/",
@@ -131,4 +135,29 @@ clean_fsa <- function(x, v1_end) {
              str_replace("-", "NA") %>%
              as.numeric) %>%
     select(-geom, -easting, -northing, -tide, -datetime_collected, -depth)
+}
+
+
+
+
+load_copernicus <- function(f, grd.dates,
+                            xmin=-Inf, xmax=Inf, ymin=54, ymax=Inf) {
+  library(ncdf4); library(tidyverse)
+  cop.dims <- nc_open(f[1])$dim
+  i <- list(lon=which(cop.dims$longitude$vals >= xmin &
+                        cop.dims$longitude$vals <= xmax),
+            lat=which(cop.dims$latitude$vals >= ymin &
+                        cop.dims$latitude$vals <= ymax))
+  cop.names <- map_chr(f, ~names(nc_open(.x)$var))
+  
+  dim.df <- expand_grid(date=cop.dims$time$vals,
+              lat=cop.dims$latitude$vals[i$lat],
+              lon=cop.dims$longitude$vals[i$lon]) %>%
+    mutate(date=date(as.POSIXct(date, origin=lubridate::origin)),
+           grid=case_when(date < grd.dates$v1_start ~ 0,
+                          date >= grd.dates$v1_start & date <= grd.dates$v1_end ~ 1,
+                          date > grd.dates$v1_end & date <= grd.dates$v2_end ~ 2,
+                          date > grd.dates$v2_end ~ 3))
+  val.df <- map(f, ~c(ncvar_get(nc_open(.x))[i$lon,i$lat,])) %>% setNames(cop.names) 
+  bind_cols(dim.df, val.df) %>% filter(grid != 0)
 }
