@@ -101,14 +101,75 @@ setPartTrackProperties <- function(
   recordLocations="true",
   recordArrivals="true"
 ) {
-  defaults <- formals()
-  params <- defaults
-  updates <- as.list(match.call())
-  
-  updates_i <- which(names(params) %in% names(updates))
-  for(i in seq_along(updates_i)) {
-    params[i] <- updates[names(params)[i]]
-  }
+  params <- c(
+    destinationDirectory=destinationDirectory,
+    datadir=datadir,
+    datadirPrefix=datadirPrefix,
+    datadirSuffix=datadirSuffix,
+    datadir2=datadir2,
+    datadir2Prefix=datadir2Prefix,
+    datadir2Suffix=datadir2Suffix,
+    mesh1=mesh1,
+    mesh1Type=mesh1Type,
+    mesh2=mesh2,
+    coordRef=coordRef,
+    location=location,
+    minchVersion=minchVersion,
+    habitat=habitat,
+    suffix=suffix,
+    sitefile=sitefile,
+    sitefileEnd=sitefileEnd,
+    verboseSetUp=verboseSetUp,
+    start_ymd=start_ymd,
+    end_ymd=end_ymd,
+    numberOfDays=numberOfDays,
+    backwards=backwards,
+    checkOpenBoundaries=checkOpenBoundaries,
+    readHydroVelocityOnly=readHydroVelocityOnly,
+    duplicateLastDay=duplicateLastDay,
+    recordsPerFile1=recordsPerFile1,
+    dt=dt,
+    verticalDynamics=verticalDynamics,
+    fixDepth=fixDepth,
+    maxDepth=maxDepth,
+    parallelThreads=parallelThreads,
+    restartParticles=restartParticles,
+    restartParticlesCutoffDays=restartParticlesCutoffDays,
+    releaseScenario=releaseScenario,
+    nparts=nparts,
+    setStartDepth=setStartDepth,
+    startDepth=startDepth,
+    seasonalDensityPath=seasonalDensityPath,
+    thresh=thresh,
+    endOnArrival=endOnArrival,
+    rk4=rk4,
+    stepsPerStep=stepsPerStep,
+    diffusion=diffusion,
+    variableDiffusion=variableDiffusion,
+    D_h=D_h,
+    D_hVert=D_hVert,
+    salinityThreshold=salinityThreshold,
+    mortalityRate=mortalityRate,
+    salinityMort=salinityMort,
+    swimLightLevel=swimLightLevel,
+    vertSwimSpeedMean=vertSwimSpeedMean,
+    vertSwimSpeedStd=vertSwimSpeedStd,
+    sinkingRateMean=sinkingRateMean,
+    sinkingRateStd=sinkingRateStd,
+    viabletime=viabletime,
+    maxParticleAge=maxParticleAge,
+    viableDegreeDays=viableDegreeDays,
+    maxDegreeDays=maxDegreeDays,
+    recordPsteps=recordPsteps,
+    splitPsteps=splitPsteps,
+    pstepsInterval=pstepsInterval,
+    recordMovement=recordMovement,
+    recordElemActivity=recordElemActivity,
+    recordConnectivity=recordConnectivity,
+    connectivityInterval=connectivityInterval,
+    recordLocations=recordLocations,
+    recordArrivals=recordArrivals
+  )
   return(paste(names(params), params, sep="=", collapse="\n"))
 }
 
