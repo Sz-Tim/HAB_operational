@@ -255,7 +255,52 @@ write_csv(cprn.out, glue("data/toDate/cprn_{dates.n$v2_end}.csv"))
 
 # algal densities ---------------------------------------------------------
 
+species <- c("alexandrium_sp", "dinophysis_sp", "karenia_mikimotoi",
+             "prorocentrum_lima", "pseudo_nitzschia_sp")
 
+sampling.df <- read_csv(glue("data/toDate/hydro_i_L_{dates.n$v2_end}.csv"))
+
+thresh.df <- read_csv(glue("data/hab_tf_thresholds.csv")) %>%
+  filter(!is.na(tl)) %>%
+  group_by(hab_parameter, tl) %>%
+  slice_head(n=1) %>%
+  ungroup %>%
+  mutate(bloom=as.numeric(!is.na(alert)))
+
+# TODO: This is copied and largely unedited
+for(sp in 1:length(species)) {
+  target <- species[sp]
+  target.tf <- thresh.df %>% filter(hab_parameter==target)
+  
+  target.df <- sampling.df %>%
+    filter(grid==1) %>% 
+    rename(N=!!target) %>%
+    select(obs.id, site.id, date, hour, grid, lon, lat, fetch, bearing, N) %>%
+    mutate(yday=yday(date),
+           ydayCos=cos(2*pi*yday/365),
+           ydaySin=sin(2*pi*yday/365),
+           year=year(date),
+           bearing=bearing*pi/180,
+           N=round(N),
+           N.ln=log1p(N),
+           N.PA=as.numeric(N>0)) %>%
+    rowwise() %>%
+    mutate(N.cat=target.tf$tl[max(which(N >= target.tf$min_ge))]) %>%
+    ungroup %>%
+    mutate(N.catF=factor(N.cat, levels=unique(target.tf$tl), ordered=T),
+           N.catNum=as.numeric(N.catF),
+           N.bloom=target.tf$bloom[match(N.cat, target.tf$tl)]) %>%
+    arrange(site.id, date) %>%
+    group_by(site.id) %>%
+    multijetlag(N.ln, N.PA, N.cat, N.catF, N.bloom, date, n=2) %>%
+    ungroup %>%
+    mutate(across(starts_with("date_"), ~as.numeric(date-.x)),
+           # I don't love this since small if N.ln_x is small OR date_x is large
+           N.lnWt_1=N.ln_1/date_1,
+           N.lnWt_2=N.ln_2/date_2) 
+  
+  write_csv(target.df, glue("out/toDate/dataset_{target}.csv"))
+}
 
 
 
@@ -272,4 +317,14 @@ write_csv(cprn.out, glue("data/toDate/cprn_{dates.n$v2_end}.csv"))
 
 # compile -----------------------------------------------------------------
 
-
+# TODO: copied from 02_HB_initFit.R
+target.df %>%
+  full_join(hydro.df) %>%
+  full_join(connect.df) %>%
+  mutate(across(contains("Dir_"), ~cos(.x-bearing))) %>%
+  mutate(across(one_of(grep("Dir", covars, invert=T, value=T)), CenterScale)) %>%
+  arrange(site.id, date) %>%
+  filter(complete.cases(.)) %>%
+  select(site.id, lon, lat, date, year, obs.id, fetch, bearing,
+         starts_with("N"), starts_with("date_"), starts_with("yday"),
+         one_of(covars))
