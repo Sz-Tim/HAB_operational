@@ -32,12 +32,10 @@ mkdir arrivals
 mv arrivals_* arrivals/
 mkdir connectivity
 mv connectivity_* connectivity/
-mkdir pstepsI
-mv pstepsI* pstepsI/
 mkdir pstepsM
 mv pstepsM* pstepsM/
 mkdir mvmt
 mv movement* mvmt/
 mkdir locs
-mv locations* locs/
+mv locations_* locs/
 

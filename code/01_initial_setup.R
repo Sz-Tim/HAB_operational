@@ -61,8 +61,8 @@ wc1.prop <- setPartTrackProperties(parallelThreads=cores,
                                    mesh1=paste0(dirs$mesh, "WeStCOMS_mesh.nc"),
                                    location="minch",
                                    minchVersion="2",
-                                   sitefile="../large_elem_centroids_v1.dat",
-                                   sitefileEnd="../fsa_sites_v1.dat",
+                                   sitefile="../../large_elem_centroids_v1.dat",
+                                   sitefileEnd="../../fsa_sites_v1.dat",
                                    start_ymd=dates.n$v1_start,
                                    end_ymd=dates.n$v1_end)
 cat(wc1.prop, "\n", file="past/HAB_WeStCOMS1.properties")
@@ -71,7 +71,7 @@ system2("bash", c("runPTrack_smn.sh", "HAB_WeStCOMS1.properties"))
 # WeStCOMS v2
 wc2.prop <- setPartTrackProperties(parallelThreads=cores,
                                    destinationDirectory="past/init_v2/",
-                                   restartParticles="past/init_v1/locationsEnd.dat",
+                                   restartParticles="../init_v1/locationsEnd.dat",
                                    start_ymd=dates.n$v1_end,
                                    end_ymd=dates.n$v2_end)
 cat(wc2.prop, "\n", file="past/HAB_WeStCOMS2.properties")
