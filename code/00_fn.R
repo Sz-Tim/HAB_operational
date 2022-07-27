@@ -101,10 +101,16 @@ setPartTrackProperties <- function(
   recordLocations="true",
   recordArrivals="true"
 ) {
-  args <- formals()
-  return(paste(names(args), args, sep="=", collapse="\n"))
+  defaults <- formals()
+  params <- defaults
+  updates <- as.list(match.call())
+  
+  updates_i <- which(names(params) %in% names(updates))
+  for(i in seq_along(updates_i)) {
+    params[i] <- updates[names(params)[i]]
+  }
+  return(paste(names(params), params, sep="=", collapse="\n"))
 }
-
 
 
 
