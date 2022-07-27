@@ -209,6 +209,7 @@ write_csv(hydro.df, glue("data/toDate/hydro_{dates.n$v2_end}.csv"))
 
 # Copernicus --------------------------------------------------------------
 
+nLags <- 7
 cprn.df <- load_copernicus(dir(dirs$cprn, full.names=T), dates.c) %>% 
   filter(!is.na(chl)) %>%
   group_by(date) %>% mutate(id=row_number()) %>% ungroup
