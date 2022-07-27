@@ -62,7 +62,7 @@ setPartTrackProperties <- function(
   dt=3600,
   verticalDynamics="true",
   fixDepth="false",
-  maxDepth="",
+  maxDepth=10000,
   parallelThreads=4,
   restartParticles="",
   restartParticlesCutoffDays=21,
