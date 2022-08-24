@@ -33,6 +33,8 @@ This involves the following steps:
   7. Extract toxin concentrations
   8. Load traffic light thresholds
   9. Compile datasets for each species
+  TODO: Add particle tracking release from monitoring sites
+  TODO: Add column to startSiteFile with starting densities (default to 1 for all)
 ### code/02-1_fit_initial_models.R
   1. Load compiled datasets
   2. Define predictors
