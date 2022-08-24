@@ -37,17 +37,15 @@ dirs <- switch(get_os(),
                           cprn="/home/sa04ts/gis/copernicus/"),
                # TODO: set up directories for testing on windows (maybe)
                windows=list(proj=getwd(),
-                            part="/home/sa04ts/HAB_operational/init/",
+                            part="ptrack/",
                             wc="/media/archiver/common/sa01da-work/",
-                            mesh="/home/sa04ts/FVCOM_meshes/",
-                            cprn="/home/sa04ts/gis/copernicus/"))
+                            mesh="../WeStCOMS/data/",
+                            cprn="../00_gis/copernicus/"))
 
 # site locations
-fsa_v1 <- read_delim(paste0(dirs$part, "fsa_sites_v1.dat"), 
+fsa.id <- read_delim(paste0(dirs$part, "fsa_sites_v2.dat"), 
                      delim="\t", col_names=c("site.id", "x", "y")) %>%
   filter(!site.id %in% c(70, 74, 75, 80, 88))
-fsa_v2 <- read_delim(paste0(dirs$part, "fsa_sites_v2.dat"), 
-                     delim="\t", col_names=c("site.id", "x", "y"))
 
 
 
@@ -87,7 +85,7 @@ connect.v1 <- connect.f %>%
             summarise(across(everything(), sum)) %>% 
             ungroup) %>%
   pivot_longer(-1, names_to="site.id", values_to="influx") %>%
-  mutate(site.id=rep(fsa_v1$site.id, length(connect.f)),
+  mutate(site.id=rep(fsa.id$site.id, length(connect.f)),
          date=ymd(date))
 connect.f <- dir("past/init_v2/connectivity")
 connect.v2 <- connect.f %>%
@@ -210,41 +208,31 @@ write_csv(hydro.df, glue("data/toDate/hydro_{dates.n$v2_end}.csv"))
 # Copernicus --------------------------------------------------------------
 
 nLags <- 7
-cprn.df <- load_copernicus(dir(dirs$cprn, full.names=T), dates.c) %>% 
+cprn.df <- load_copernicus(dir(dirs$cprn, "nc$", full.names=T), dates.c) %>% 
   filter(!is.na(chl)) %>%
   group_by(date) %>% mutate(id=row_number()) %>% ungroup
 cprn.sf <- cprn.df %>% filter(date==first(date)) %>%
   st_as_sf(., coords=c("lon", "lat"), crs=4326)
 
-# match fsa v1 site locations
-fsa_v1.sf <- st_as_sf(fsa_v1, coords=c("x", "y"), crs=27700)
-fsa_v1.cprn <- fsa_v1 %>%
-  rename(site.id_v1=site.id) %>%
-  mutate(cprn_id=st_nearest_feature(fsa_v1.sf %>% st_transform(4326), cprn.sf))
+# match fsa site locations
+fsa.id.sf <- st_as_sf(fsa.id, coords=c("x", "y"), crs=27700)
+fsa.id.cprn <- fsa.id %>%
+  mutate(cprn_id=st_nearest_feature(fsa.id.sf %>% st_transform(4326), cprn.sf))
 cprn.df <- left_join(cprn.df, 
-                    select(fsa_v1.cprn, -x, -y), 
-                    by=c("id"="cprn_id"))
-
-# match fsa v2 site locations
-fsa_v2.sf <- st_as_sf(fsa_v2, coords=c("x", "y"), crs=27700)
-fsa_v2.cprn <- fsa_v2 %>%
-  rename(site.id_v2=site.id) %>%
-  mutate(cprn_id=st_nearest_feature(fsa_v2.sf %>% st_transform(4326), cprn.sf))
-cprn.df <- left_join(cprn.df, 
-                    select(fsa_v2.cprn, -x, -y), 
+                    select(fsa.id.cprn, -x, -y), 
                     by=c("id"="cprn_id"))
 
 # calculate lags
 cprn.out <- cprn.df %>% 
-  filter(!is.na(site.id_v1) | !is.na(site.id_v2)) %>%
-  select(date, lat, lon, grid, id, site.id_v1, site.id_v2,
+  filter(!is.na(site.id)) %>%
+  select(date, lat, lon, grid, id, site.id,
          chl, attn, no3, o2, diato, dino, ph, po4, nppv, spco2) %>%
   group_by(id) %>%
   multijetlag(chl, attn, no3, o2, diato, dino, ph, po4, nppv, spco2, n=nLags) %>%
   pivot_longer(-(1:7), names_to="var", values_to="val") %>%
   mutate(timespan=if_else(str_split_fixed(var, "_", 2)[,2]=="", "0", "wk"),
          var=str_split_fixed(var, "_", 2)[,1]) %>%
-  group_by(date, id, site.id_v1, site.id_v2, var, timespan) %>%
+  group_by(date, id, site.id, var, timespan) %>%
   summarise(across(where(is.numeric), ~mean(.x, na.rm=T))) %>%
   ungroup %>%
   pivot_wider(names_from=c(var, timespan), values_from=val,
