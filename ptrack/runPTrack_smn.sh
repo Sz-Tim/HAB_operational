@@ -11,20 +11,19 @@ fi
 
 pwd
 
-#OUTDIR=output/${3}
 # Revised: get the output directory from the properties file
 OUTDIR=`sed -n -e '/^destinationDirectory/p' $1 | cut -d "=" -f 2 | xargs`
 echo
 echo "output directory = "$OUTDIR
-#mkdir $OUTDIR 
-cd $OUTDIR
 
 # Copy the properties file
-cp ../${1} .
+cp ${1} $OUTDIR
 # Copy the site file
-
 SITEFILE=`sed -n -e '/^sitefile/p' $1 | cut -d "=" -f 2 | xargs`
 echo "sitefile = "$SITEFILE
+
+cd $OUTDIR
+pwd
 
 /usr/local/java/jre1.8.0_211/bin/java -Xmx8192m -Xms4096m -jar /home/sa04ts/biotracker/particle_track.jar ${1} > stdout.txt
 
