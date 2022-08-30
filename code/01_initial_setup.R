@@ -44,8 +44,8 @@ dirs <- switch(get_os(),
 
 # site locations
 fsa.id <- read_delim(paste0(dirs$part, "fsa_sites_v2.dat"), 
-                     delim="\t", col_names=c("site.id", "x", "y")) %>%
-  filter(!site.id %in% c(70, 74, 75, 80, 88))
+                     delim="\t", col_names=c("site.id", "x", "y"))# %>%
+  # filter(!site.id %in% c(70, 74, 75, 80, 88))
 
 
 
@@ -69,7 +69,6 @@ cat(wc1.prop, "\n", file="HAB_WeStCOMS1.properties")
 system2("bash", c("runPTrack_smn.sh", "HAB_WeStCOMS1.properties"))
 
 # WeStCOMS v2
-# TODO: v2 mesh does not include siglev, so update java for siglev = siglay + 1
 wc2.prop <- setPartTrackProperties(parallelThreads=cores,
                                    destinationDirectory="init_v2/",
                                    restartParticles="../init_v1/locationsEnd.dat",
