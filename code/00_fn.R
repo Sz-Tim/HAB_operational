@@ -87,7 +87,7 @@ setPartTrackProperties <- function(
   vertSwimSpeedStd=0,
   sinkingRateMean=0,
   sinkingRateStd=0,
-  viabletime=-1,
+  viabletime=1,
   maxParticleAge=168,
   viableDegreeDays=-1,
   maxDegreeDays=-1,

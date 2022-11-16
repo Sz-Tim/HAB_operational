@@ -44,8 +44,8 @@ dirs <- switch(get_os(),
 
 # site locations
 fsa.id <- read_delim(paste0(dirs$part, "fsa_sites_v2.dat"), 
-                     delim="\t", col_names=c("site.id", "x", "y"))# %>%
-  # filter(!site.id %in% c(70, 74, 75, 80, 88))
+                     delim="\t", col_names=c("site.id", "x", "y")) %>%
+  filter(!site.id %in% c(70, 74, 75, 80, 88)) # these are not in v1, but are in v2.
 
 
 
@@ -80,34 +80,34 @@ cat(wc2.prop, "\n", file="HAB_WeStCOMS2.properties")
 system2("bash", c("../runPTrack_smn.sh", "HAB_WeStCOMS2.properties"))
 
 # compile output
-connect.f <- dir("init_v1/connectivity")
-connect.v1 <- connect.f %>%
-  map_dfr(~read_delim(glue("init_v1/connectivity/{.x}"), 
-                      delim=" ", col_names=F, show_col_types=F) %>% 
-            mutate(date=str_sub(.x, 14, 21)) %>%
-            group_by(date) %>% 
-            summarise(across(everything(), sum)) %>% 
-            ungroup) %>%
-  pivot_longer(-1, names_to="site.id", values_to="influx") %>%
-  mutate(site.id=rep(fsa.id$site.id, length(connect.f)),
-         date=ymd(date))
-connect.f <- dir("init_v2/connectivity")
-connect.v2 <- connect.f %>%
-  map_dfr(~read_delim(glue("init_v1/connectivity/{.x}"), 
-                      delim=" ", col_names=F, show_col_types=F) %>% 
-            mutate(date=str_sub(.x, 14, 21)) %>%
-            group_by(date) %>% 
-            summarise(across(everything(), sum)) %>% 
-            ungroup) %>%
-  pivot_longer(-1, names_to="site.id", values_to="influx") %>%
-  mutate(site.id=rep(fsa_v2$site.id, length(connect.f)),
-         date=ymd(date))
-
-bind_rows(connect.v1 %>% filter(! date %in% connect.v2$date), 
-          connect.v2) %>%
-  write_csv(paste0(dirs$proj, glue("/data/toDate/influx_{dates.n$v2_end}.csv")))
-
-setwd(dirs$proj)
+# connect.f <- dir("init_v1/connectivity")
+# connect.v1 <- connect.f %>%
+#   map_dfr(~read_delim(glue("init_v1/connectivity/{.x}"), 
+#                       delim=" ", col_names=F, show_col_types=F) %>% 
+#             mutate(date=str_sub(.x, 14, 21)) %>%
+#             group_by(date) %>% 
+#             summarise(across(everything(), sum)) %>% 
+#             ungroup) %>%
+#   pivot_longer(-1, names_to="site.id", values_to="influx") %>%
+#   mutate(site.id=rep(fsa.id$site.id, length(connect.f)),
+#          date=ymd(date))
+# connect.f <- dir("init_v2/connectivity")
+# connect.v2 <- connect.f %>%
+#   map_dfr(~read_delim(glue("init_v2/connectivity/{.x}"), 
+#                       delim=" ", col_names=F, show_col_types=F) %>% 
+#             mutate(date=str_sub(.x, 14, 21)) %>%
+#             group_by(date) %>% 
+#             summarise(across(everything(), sum)) %>% 
+#             ungroup) %>%
+#   pivot_longer(-1, names_to="site.id", values_to="influx") %>%
+#   mutate(site.id=rep(fsa.id$site.id, length(connect.f)),
+#          date=ymd(date))
+# 
+# bind_rows(connect.v1 %>% filter(! date %in% connect.v2$date), 
+#           connect.v2) %>%
+#   write_csv(paste0(dirs$proj, glue("/data/toDate/influx_{dates.n$v2_end}.csv")))
+# 
+# setwd(dirs$proj)
 
 
 # 
