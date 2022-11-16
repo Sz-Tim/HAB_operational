@@ -44,7 +44,7 @@ setPartTrackProperties <- function(
   mesh1Type="FVCOM",
   mesh2="",
   coordRef="OSGB1936",
-  location="minch",
+  location="westcoms",
   minchVersion=2,
   habitat="",
   suffix="",
